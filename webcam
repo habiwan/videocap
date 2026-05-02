@@ -1,0 +1,38 @@
+#!/bin/bash
+
+# 1. Find the ASUS GC21 Video device
+# We look for "GC21" specifically to ignore the AverMedia
+DEVICE=$(v4l2-ctl --list-devices | grep -A 1 -i "GC21" | grep "/dev/video" | head -n 1 | xargs)
+
+if [ -z "$DEVICE" ]; then
+    echo "❌ Error: ASUS GC21 Webcam not found!"
+    exit 1
+fi
+
+echo "✅ Found Webcam at: $DEVICE"
+
+# 2. Setup Audio Loopback for the Webcam mic
+# This is useful if you want to hear yourself or test the mic
+echo "🔊 Starting Webcam Mic Loopback..."
+pactl unload-module module-loopback 2>/dev/null
+pactl load-module module-loopback latency_msec=40 source_dont_move=true
+
+# 3. Find the ASUS Audio source and set volume
+SOURCE_NAME=$(pactl list sources short | grep -i "GC21" | awk '{print $2}')
+if [ ! -z "$SOURCE_NAME" ]; then
+    pactl set-source-volume "$SOURCE_NAME" 70%
+fi
+
+echo "📸 Launching Webcam Preview..."
+
+# 4. Launch ffplay
+# Note: Most internal webcaps are 1280x720 or 1920x1080 at 30fps.
+# I added -vf "format=yuv420p" to ensure it looks right on your HDR screen.
+ffplay -hide_banner -alwaysontop \
+    -f v4l2 -video_size 1920x1080 -framerate 30 -i "$DEVICE" \
+    -vf "format=yuv420p" \
+    -fflags nobuffer -flags low_delay -framedrop -an
+
+# 5. Cleanup
+echo "🧹 Cleaning up audio..."
+pactl unload-module module-loopback
