@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# --- 1. IDENTIFY DEVICES ---
+CAP_DEV=$(v4l2-ctl --list-devices | grep -A 1 -i "Live Gamer" | grep "/dev/video" | head -n 1 | xargs)
+CAM_DEV=$(v4l2-ctl --list-devices | grep -A 1 -i "GC21" | grep "/dev/video" | head -n 1 | xargs)
+
+if [ -z "$CAP_DEV" ] || [ -z "$CAM_DEV" ]; then
+    echo "❌ Error: One or more devices missing!"
+    exit 1
+fi
+
+# --- 2. START AUDIO INDEPENDENTLY ---
+echo "🔊 Initializing audio bridges..."
+
+# Improved detection for AverMedia (Capture Card)
+CAP_SINK=$(pactl list sources short | grep -iE "Live_Gamer|AverMedia" | awk '{print $2}' | head -n 1)
+if [ ! -z "$CAP_SINK" ]; then
+    CAP_LOOP_ID=$(pactl load-module module-loopback source="$CAP_SINK" latency_msec=20 adjust_time=0)
+    pactl set-source-volume "$CAP_SINK" 65%
+    echo "✅ AverMedia Audio Started"
+else
+    echo "⚠️ Warning: AverMedia Audio Source not found!"
+fi
+
+# Improved detection for GC21 (Webcam)
+CAM_SINK=$(pactl list sources short | grep -i "GC21" | awk '{print $2}' | head -n 1)
+if [ ! -z "$CAM_SINK" ]; then
+    CAM_LOOP_ID=$(pactl load-module module-loopback source="$CAM_SINK" latency_msec=40)
+    pactl set-source-volume "$CAM_SINK" 70%
+    echo "✅ Webcam Audio Started"
+fi
+
+# --- 3. LAUNCH VIDEO ---
+# Webcam (Small Pip)
+ffplay -hide_banner -alwaysontop -left 20 -top 20 -x 480 -y 270 \
+    -f v4l2 -video_size 1920x1080 -framerate 30 -i "$CAM_DEV" \
+    -vf "format=yuv420p" -fflags nobuffer -flags low_delay -an &
+CAM_PID=$!
+
+# Game (Main Window)
+ffplay -hide_banner -fs -alwaysontop \
+    -f v4l2 -video_size 1920x1080 -framerate 60 -i "$CAP_DEV" \
+    -fflags nobuffer+fastseek -probesize 32 -analyzeduration 0 -an
+
+# --- 4. CLEANUP ---
+echo "🧹 Closing..."
+kill $CAM_PID 2>/dev/null
+[ ! -z "$CAP_LOOP_ID" ] && pactl unload-module "$CAP_LOOP_ID"
+[ ! -z "$CAM_LOOP_ID" ] && pactl unload-module "$CAM_LOOP_ID"
