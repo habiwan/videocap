@@ -1,5 +1,5 @@
 # videocap / webcam / vwstream
-Using Avermedia USB capture card on ROG strix with bazzite
+Using Avermedia USB capture card and ROG webcam on ROG strix with bazzite
 
 If you have an Avermedia Live Gamer EXTREME 3 USB 3 device like I do, you can use ffplay and ffmpeg to run it on fedora / bazzite linux, maybe others? probably tweaks needed for pulseaudio pipewire or alsa whatever... future project!
 
