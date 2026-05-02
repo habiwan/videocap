@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# 1. Find the Video device
+DEVICE=$(v4l2-ctl --list-devices | grep -A 1 -i "Live Gamer" | grep "/dev/video" | head -n 1 | xargs)
+
+if [ -z "$DEVICE" ]; then
+    echo "❌ Error: Live Gamer EXTREME 3 not found!"
+    exit 1
+fi
+
+echo "✅ Found device at: $DEVICE"
+echo "🎮 Starting Low-Latency Stream..."
+
+# 2. Optimized FFmpeg to FFplay pipe
+# We removed -input_format mjpeg to let the driver pick the native format
+ffmpeg -hide_banner -loglevel error \
+    -f v4l2 -video_size 1920x1080 -framerate 60 -i "$DEVICE" \
+    -f pulse -i default \
+    -c:v copy -c:a pcm_s16le \
+    -f nut - | ffplay -hide_banner -fs -alwaysontop \
+    -fflags nobuffer+fastseek -flags low_delay -framedrop -i -
