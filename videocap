@@ -9,13 +9,29 @@ if [ -z "$DEVICE" ]; then
 fi
 
 echo "✅ Found device at: $DEVICE"
-echo "🎮 Starting Low-Latency Stream..."
 
-# 2. Optimized FFmpeg to FFplay pipe
-# We removed -input_format mjpeg to let the driver pick the native format
-ffmpeg -hide_banner -loglevel error \
+# 2. Setup Audio Loopback with "Safety Buffer"
+# latency_msec=20 is the sweet spot: no human-perceptible lag,
+# but enough buffer to prevent choppiness when audio restarts.
+echo "🔊 Starting Steady-Clock Audio..."
+pactl unload-module module-loopback 2>/dev/null
+pactl load-module module-loopback latency_msec=20 adjust_time=0 source_dont_move=true sink_dont_move=true
+
+# 3. Set Volume to 60% (Slightly lower to prevent clipping on level-up sounds)
+SOURCE_NAME=$(pactl list sources short | grep -i "Live_Gamer" | awk '{print $2}')
+if [ ! -z "$SOURCE_NAME" ]; then
+    pactl set-source-volume "$SOURCE_NAME" 60%
+fi
+
+echo "🎮 Launching Video (1080p)..."
+
+# 4. Launch Video
+# Added -probesize and -analyzeduration to make the window pop up faster
+ffplay -hide_banner -fs -alwaysontop \
     -f v4l2 -video_size 1920x1080 -framerate 60 -i "$DEVICE" \
-    -f pulse -i default \
-    -c:v copy -c:a pcm_s16le \
-    -f nut - | ffplay -hide_banner -fs -alwaysontop \
-    -fflags nobuffer+fastseek -flags low_delay -framedrop -i -
+    -fflags nobuffer+fastseek -probesize 32 -analyzeduration 0 \
+    -flags low_delay -framedrop -an
+
+# 5. Cleanup
+echo "🧹 Cleaning up..."
+pactl unload-module module-loopback
