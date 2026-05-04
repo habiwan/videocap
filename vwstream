@@ -1,5 +1,5 @@
 #!/bin/bash
-
+clear
 # --- 1. IDENTIFY DEVICES ---
 CAP_DEV=$(v4l2-ctl --list-devices | grep -A 1 -i "Live Gamer" | grep "/dev/video" | head -n 1 | xargs)
 CAM_DEV=$(v4l2-ctl --list-devices | grep -A 1 -i "GC21" | grep "/dev/video" | head -n 1 | xargs)
@@ -38,7 +38,7 @@ ffplay -hide_banner -alwaysontop -left 20 -top 20 -x 480 -y 270 \
 CAM_PID=$!
 
 # Game (Main Window)
-ffplay -hide_banner -fs -alwaysontop \
+ffplay -hide_banner -fs \
     -f v4l2 -video_size 1920x1080 -framerate 60 -i "$CAP_DEV" \
     -fflags nobuffer+fastseek -probesize 32 -analyzeduration 0 -an
 
